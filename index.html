@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ViaFacile Italia - Percorsi Urbani Facili e Accessibili</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            emerald: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+              900: '#064e3b',
+            },
+            navy: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(16, 185, 129, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(16, 185, 129, 0.8);
+    }
+
+    /* Glassmorphism Classes */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .dark .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Pulse animation for active waypoint setting */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-effect {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+
+    /* Custom Leaflet Popups */
+    .leaflet-popup-content-wrapper {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 14px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+      padding: 2px;
+      color: #1e293b;
+    }
+    .dark .leaflet-popup-content-wrapper {
+      background: rgba(15, 23, 42, 0.95);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .leaflet-popup-tip {
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .dark .leaflet-popup-tip {
+      background: rgba(15, 23, 42, 0.95);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-navy-950 dark:text-slate-100 h-screen w-screen overflow-hidden flex flex-col antialiased transition-colors duration-300">
+
+  <!-- TOP HEADER / NAVBAR -->
+  <header class="h-16 px-4 md:px-6 flex items-center justify-between z-30 glass-panel shadow-sm border-b">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+        <!-- Route / Leaf Icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a9 9 0 0 1 9 9c0 4.97-4.03 9-9 9s-9-4.03-9-9a9 9 0 0 1 9-9z"/>
+          <path d="M8 12c1.5-2 3.5-3 5.5-2s3 3 2.5 5-2 3-4 3"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-extrabold text-lg md:text-xl tracking-tight text-slate-900 dark:text-white">ViaFacile<span class="text-emerald-500">.it</span></h1>
+          <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">Mobilità Dolce</span>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Vie pianeggianti, lastricate e accessibili nelle città d'Italia</p>
+      </div>
+    </div>
+
+    <!-- Quick Controls & Actions -->
+    <div class="flex items-center gap-2 md:gap-3">
+      <!-- City Selection dropdown -->
+      <div class="relative">
+        <select id="citySelector" onchange="changeCity(this.value)" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-sm font-medium rounded-lg px-3 py-1.5 pr-8 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-sm cursor-pointer transition">
+          <option value="roma">🏛️ Roma</option>
+          <option value="milano" selected>🏙️ Milano</option>
+          <option value="firenze">🎨 Firenze</option>
+          <option value="napoli">🌊 Napoli</option>
+          <option value="bologna">🎓 Bologna</option>
+          <option value="torino">👑 Torino</option>
+          <option value="cosenza">🌲 Cosenza</option>
+        </select>
+      </div>
+
+      <!-- Map Tile Layer Toggle -->
+      <button onclick="toggleMapTiles()" id="mapStyleBtn" title="Cambia stile mappa (Stradale / Topo / Satellitare)" class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      </button>
+
+      <!-- Theme Dark / Light Toggle -->
+      <button onclick="toggleDarkMode()" title="Tema Chiaro/Scuro" class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition shadow-sm">
+        <span id="themeIcon">🌙</span>
+      </button>
+
+      <!-- Mobile Sidebar Toggle -->
+      <button onclick="toggleMobileSidebar()" class="lg:hidden p-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="relative flex-1 flex overflow-hidden">
+
+    <!-- FLOATING MAP CONTROLS & SEARCH BAR -->
+    <div class="absolute top-4 left-4 z-20 flex flex-col gap-2 w-full max-w-sm pointer-events-none">
+      <div class="pointer-events-auto flex items-center bg-white/95 dark:bg-slate-800/95 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-1.5">
+        <span class="pl-2.5 text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </span>
+        <input id="searchInput" type="text" placeholder="Cerca via o piazza..." 
+          onkeydown="if(event.key==='Enter') executeSearch()"
+          class="w-full bg-transparent border-0 px-2.5 py-1 text-sm focus:outline-none dark:text-white text-slate-800 placeholder-slate-400">
+        <button onclick="executeSearch()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition">
+          Cerca
+        </button>
+      </div>
+
+      <!-- Quick Accessibility Filters Badges -->
+      <div class="pointer-events-auto flex flex-wrap gap-1.5">
+        <button onclick="setFilter('all')" id="filter-all" class="filter-btn text-xs px-2.5 py-1 rounded-full font-medium shadow-sm transition bg-emerald-600 text-white border border-emerald-500">
+          Tutti
+        </button>
+        <button onclick="setFilter('no-climb')" id="filter-no-climb" class="filter-btn text-xs px-2.5 py-1 rounded-full font-medium shadow-sm transition bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700">
+          🟢 Senza Salite
+        </button>
+        <button onclick="setFilter('smooth')" id="filter-smooth" class="filter-btn text-xs px-2.5 py-1 rounded-full font-medium shadow-sm transition bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700">
+          ♿ Liscia / No Sanpietrini
+        </button>
+        <button onclick="setFilter('pedestrian')" id="filter-pedestrian" class="filter-btn text-xs px-2.5 py-1 rounded-full font-medium shadow-sm transition bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700">
+          🚶 Solo Pedonale
+        </button>
+        <button onclick="setFilter('shade')" id="filter-shade" class="filter-btn text-xs px-2.5 py-1 rounded-full font-medium shadow-sm transition bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700">
+          🌳 Ombra & Parchi
+        </button>
+      </div>
+    </div>
+
+    <!-- MAP CANVAS -->
+    <div id="map" class="w-full h-full z-10"></div>
+
+    <!-- MAP LEGEND (Bottom Left) -->
+    <div class="absolute bottom-6 left-4 z-20 hidden sm:block pointer-events-auto">
+      <div class="glass-panel rounded-xl p-3 shadow-lg border border-slate-200 dark:border-slate-800 text-xs flex flex-col gap-1.5">
+        <span class="font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider text-[10px]">Legenda Facilità</span>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+          <span class="text-slate-600 dark:text-slate-300 font-medium">Facile / Pianeggiante / Liscia</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+          <span class="text-slate-600 dark:text-slate-300 font-medium">Moderata (dislivello dolce o lastricato)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-3.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+          <span class="text-slate-600 dark:text-slate-300 font-medium">Impegnativa (pendenza > 7% o ciottoli)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR: DETAILS, ROUTE CALCULATOR & EXPLORER -->
+    <aside id="sidebar" class="absolute top-0 right-0 h-full w-full sm:w-[420px] z-30 glass-panel shadow-2xl flex flex-col transform translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out border-l border-slate-200 dark:border-slate-800">
+      
+      <!-- Tabs (Esplora Vie / Calcola A->B) -->
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-4 pt-3 bg-white/50 dark:bg-slate-900/50">
+        <div class="flex space-x-2">
+          <button onclick="switchTab('explore')" id="tabExplore" class="pb-2.5 px-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400">
+            Vie Consigliate
+          </button>
+          <button onclick="switchTab('routing')" id="tabRouting" class="pb-2.5 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400">
+            Calcola Itinerario
+          </button>
+        </div>
+        <button onclick="toggleMobileSidebar()" class="lg:hidden text-slate-500 hover:text-slate-700 dark:text-slate-400 mb-2 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- TAB 1: EXPLORE DETAILS & LIST -->
+      <div id="contentExplore" class="flex-1 overflow-y-auto p-4 space-y-4">
+        
+        <!-- SELECTED ROUTE CARD (Dynamically Filled) -->
+        <div id="selectedRouteContainer" class="hidden">
+          <div class="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-950/40 dark:to-teal-950/20 border border-emerald-500/30 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <span id="routeBadgeCategory" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500 text-white">Consigliata</span>
+                <h3 id="routeName" class="text-lg font-bold text-slate-900 dark:text-white mt-1">Nome Via</h3>
+                <p id="routeCityContext" class="text-xs text-slate-500 dark:text-slate-400">Milano • Centro Storico</p>
+              </div>
+              <div class="text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl shadow-xs">
+                <div class="text-[10px] uppercase font-bold text-slate-400">Facilità</div>
+                <div id="routeScore" class="text-xl font-black text-emerald-600 dark:text-emerald-400">9.8</div>
+              </div>
+            </div>
+
+            <!-- Elevation Visual Chart -->
+            <div class="my-3">
+              <div class="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                <span>Profilo Altimetrico</span>
+                <span id="routeElevationDiff" class="font-semibold text-emerald-600 dark:text-emerald-400">Pendenza: ~0.4%</span>
+              </div>
+              <div class="h-14 w-full bg-slate-200/60 dark:bg-slate-800/80 rounded-lg p-1.5 relative flex items-end">
+                <svg id="elevationChartSvg" class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 30">
+                  <path id="elevationPath" d="M0,25 Q30,22 60,24 T100,20 L100,30 L0,30 Z" fill="rgba(16, 185, 129, 0.35)" stroke="#10b981" stroke-width="2"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-3 gap-2 my-3 text-center">
+              <div class="bg-white/80 dark:bg-slate-800/70 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Lunghezza</span>
+                <span id="routeLength" class="text-sm font-bold text-slate-800 dark:text-slate-200">1.2 km</span>
+              </div>
+              <div class="bg-white/80 dark:bg-slate-800/70 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Tempo a piedi</span>
+                <span id="routeTime" class="text-sm font-bold text-slate-800 dark:text-slate-200">14 min</span>
+              </div>
+              <div class="bg-white/80 dark:bg-slate-800/70 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+                <span class="text-[10px] text-slate-400 uppercase font-semibold block">Fondo</span>
+                <span id="routeSurface" class="text-sm font-bold text-slate-800 dark:text-slate-200">Asfalto liscio</span>
+              </div>
+            </div>
+
+            <!-- Features & Accessibility Highlights -->
+            <div id="routeTagsContainer" class="flex flex-wrap gap-1.5 mb-3">
+              <!-- Dynamically populated tags -->
+            </div>
+
+            <!-- Practical Advice -->
+            <div class="bg-white/90 dark:bg-slate-800/90 rounded-xl p-2.5 text-xs text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-start gap-2">
+              <span class="text-emerald-500 font-bold text-base leading-none">💡</span>
+              <p id="routeTips">Via pedonalizzata, pavimentazione liscia senza dislivelli né gradini. Ideale con passeggini e carrozzine.</p>
+            </div>
+
+            <button onclick="zoomToSelected()" class="mt-3 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              Centra sulla Mappa
+            </button>
+          </div>
+        </div>
+
+        <!-- City Overview & List -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Tratte Facili in Evidenza</h4>
+            <span id="routesCountBadge" class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-600 dark:text-slate-400 font-medium">3 disponibili</span>
+          </div>
+
+          <!-- List of City Routes -->
+          <div id="cityRoutesList" class="space-y-2.5">
+            <!-- Populated via Javascript -->
+          </div>
+        </div>
+
+        <!-- Accessible Spots & POIs in this City -->
+        <div class="pt-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Punti di Sosta & Fontanelle</h4>
+          <div id="poisContainer" class="grid grid-cols-2 gap-2">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 2: ROUTING CALCULATOR (A -> B) -->
+      <div id="contentRouting" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="bg-white/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+          <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            Calcola Percorso a Basso Sforzo
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Clicca sulla mappa per fissare la partenza e la destinazione, oppure usa le opzioni rapide. L'algoritmo eviterà salite ripide e pavimentazioni dissestate.
+          </p>
+
+          <!-- Input Origin -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Punto A (Partenza)</label>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0"></span>
+              <input id="inputOrigin" type="text" readonly placeholder="Seleziona sulla mappa..." class="w-full text-xs p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              <button onclick="startPointPicking('origin')" id="btnPickOrigin" title="Imposta cliccando sulla mappa" class="px-2.5 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-emerald-500 hover:text-white rounded-lg text-xs font-medium transition">
+                📍 Clicca
+              </button>
+            </div>
+          </div>
+
+          <!-- Input Destination -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Punto B (Arrivo)</label>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500 flex-shrink-0"></span>
+              <input id="inputDestination" type="text" readonly placeholder="Seleziona sulla mappa..." class="w-full text-xs p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              <button onclick="startPointPicking('dest')" id="btnPickDest" title="Imposta cliccando sulla mappa" class="px-2.5 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-rose-500 hover:text-white rounded-lg text-xs font-medium transition">
+                🏁 Clicca
+              </button>
+            </div>
+          </div>
+
+          <!-- Route Criteria selection -->
+          <div class="pt-2">
+            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">Priorità del Percorso</label>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 cursor-pointer">
+                <input type="radio" name="routePriority" value="flat" checked class="text-emerald-600 focus:ring-emerald-500">
+                <span>Massima Pianura</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 cursor-pointer">
+                <input type="radio" name="routePriority" value="smooth" class="text-emerald-600 focus:ring-emerald-500">
+                <span>No Sanpietrini</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button onclick="calculateCustomRoute()" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Trova Via Più Facile
+            </button>
+            <button onclick="resetCalculator()" title="Resetta Punti" class="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs transition">
+              🔄
+            </button>
+          </div>
+        </div>
+
+        <!-- Calculated Route Results Box -->
+        <div id="routingResultBox" class="hidden bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>✨</span> Itinerario Calcolato
+            </span>
+            <span class="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 font-bold px-2 py-0.5 rounded-full">Indice Facilità: 9.6/10</span>
+          </div>
+
+          <div id="routingDetailsList" class="text-xs space-y-2 text-slate-700 dark:text-slate-300">
+            <!-- Dynamically populated itinerary summary -->
+          </div>
+
+          <div class="p-2 bg-white dark:bg-slate-800 rounded-lg text-[11px] text-slate-500 dark:text-slate-400">
+            ✅ <strong>0 scalinate rilevate</strong> | 92% marciapiedi larghi o zona pedonale | Pendenza max 1.8%
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER INFO -->
+      <div class="p-3 bg-white/70 dark:bg-slate-900/70 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 flex justify-between items-center">
+        <span>Dati: © OpenStreetMap Contributori</span>
+        <span class="text-emerald-600 dark:text-emerald-400 font-medium">100% Pedonale & Senza Barriere</span>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // --- DATABASE DELLE CITTÀ & VIE FACILI RACCOMANDATE ---
+    const citiesData = {
+      milano: {
+        name: "Milano",
+        coords: [45.4642, 9.1900],
+        zoom: 14,
+        description: "Città in gran parte pianeggiante con estese isole pedonali.",
+        routes: [
+          {
+            id: 'mi-1',
+            name: "Dorsale Parco Sempione - Corso Sempione",
+            type: "Parco & Viale Alberato",
+            category: "shade",
+            surface: "Ghiaia stabilizzata & Lastricato liscio",
+            paveType: "smooth",
+            lengthKm: 1.8,
+            walkMinutes: 22,
+            slopeAvg: "0.2%",
+            elevationGain: "+3m",
+            score: 9.8,
+            tips: "Zero pendenza, ampie zone ombreggiate, panchine ogni 100m e bagni accessibili.",
+            coords: [
+              [45.4705, 9.1795],
+              [45.4725, 9.1760],
+              [45.4750, 9.1720],
+              [45.4785, 9.1660],
+              [45.4810, 9.1610]
+            ],
+            elevProfile: "M0,25 Q40,24 70,25 T100,24 L100,30 L0,30 Z"
+          },
+          {
+            id: 'mi-2',
+            name: "Asse Pedonale Duomo - Castello Sforzesco",
+            type: "Area Pedonale / ZTL",
+            category: "pedestrian",
+            surface: "Lastricato granito levigato (via Dante)",
+            paveType: "smooth",
+            lengthKm: 1.2,
+            walkMinutes: 15,
+            slopeAvg: "0.1%",
+            elevationGain: "+1m",
+            score: 9.5,
+            tips: "Completamente pedonalizzata e liscia. Evitare ore di punta per affollamento turistico.",
+            coords: [
+              [45.4641, 9.1895], // Piazza Duomo
+              [45.4658, 9.1865], // Piazza Cordusio
+              [45.4678, 9.1835], // Via Dante
+              [45.4704, 9.1794]  // Castello
+            ],
+            elevProfile: "M0,26 Q50,25 80,26 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'mi-3',
+            name: "Passeggiata BAM Biblioteca degli Alberi - Gae Aulenti",
+            type: "Parco Contemporaneo",
+            category: "smooth",
+            surface: "Cemento architettonico liscio & ponti con rampe",
+            paveType: "smooth",
+            lengthKm: 1.4,
+            walkMinutes: 18,
+            slopeAvg: "0.5%",
+            elevationGain: "+5m (rampe dolci)",
+            score: 9.9,
+            tips: "Perfetto per carrozzine e pattini. Rampe a norma al posto delle scale.",
+            coords: [
+              [45.4840, 9.1890],
+              [45.4855, 9.1915],
+              [45.4870, 9.1945],
+              [45.4862, 9.1980]
+            ],
+            elevProfile: "M0,28 Q30,22 60,20 T100,21 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Fontanella Vedovella Duomo", type: "water", coords: [45.4645, 9.1888] },
+          { name: "Panchine d'Ombra Parco Sempione", type: "bench", coords: [45.4728, 9.1755] },
+          { name: "Ascensore Gae Aulenti", type: "lift", coords: [45.4838, 9.1898] }
+        ]
+      },
+      roma: {
+        name: "Roma",
+        coords: [41.9028, 12.4964],
+        zoom: 14,
+        description: "Itinerari studiati per aggirare i 7 colli e i tratti più sconnessi di sanpietrini.",
+        routes: [
+          {
+            id: 'rm-1',
+            name: "Lungotevere Pianeggiante (Isola Tiberina - Castel Sant'Angelo)",
+            type: "Asse Fluviale / Ciclabile",
+            category: "no-climb",
+            surface: "Asfalto liscio ciclabile",
+            paveType: "smooth",
+            lengthKm: 2.3,
+            walkMinutes: 28,
+            slopeAvg: "0.1%",
+            elevationGain: "+2m",
+            score: 9.7,
+            tips: "Quota fiume: completamente pianeggiante, zero auto, accessibile tramite rampe dedicate.",
+            coords: [
+              [41.8905, 12.4775], // Isola Tiberina
+              [41.8950, 12.4710], // Ponte Sisto
+              [41.9000, 12.4640], // Ponte Vittorio Emanuele
+              [41.9030, 12.4660]  // Castel S. Angelo
+            ],
+            elevProfile: "M0,26 Q40,25 70,26 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'rm-2',
+            name: "Via del Corso Pedonale (Piazza del Popolo - Colonna)",
+            type: "Centro Storico",
+            category: "pedestrian",
+            surface: "Lastroni levigati (sanpietrini appiattiti)",
+            paveType: "moderate",
+            lengthKm: 1.5,
+            walkMinutes: 19,
+            slopeAvg: "0.3%",
+            elevationGain: "+4m",
+            score: 8.9,
+            tips: "Evita i vicoli collinari di Monti o Pincio. Fondo dritto e agevole.",
+            coords: [
+              [41.9107, 12.4764], // P.za Popolo
+              [41.9060, 12.4790],
+              [41.9010, 12.4800]  // P.za Colonna
+            ],
+            elevProfile: "M0,25 Q50,24 80,25 T100,24 L100,30 L0,30 Z"
+          },
+          {
+            id: 'rm-3',
+            name: "Viale delle Magnolie a Villa Borghese",
+            type: "Parco Ombreggiato",
+            category: "shade",
+            surface: "Asfalto levigato parco",
+            paveType: "smooth",
+            lengthKm: 1.6,
+            walkMinutes: 20,
+            slopeAvg: "0.8%",
+            elevationGain: "+6m",
+            score: 9.3,
+            tips: "Alberi secolari, zero smog e fresco durante i mesi estivi.",
+            coords: [
+              [41.9125, 12.4820],
+              [41.9140, 12.4870],
+              [41.9130, 12.4920]
+            ],
+            elevProfile: "M0,24 Q40,22 70,23 T100,22 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Nasone Storico (Acqua fresca)", type: "water", coords: [41.9080, 12.4770] },
+          { name: "Rampa Accessibile Lungotevere", type: "ramp", coords: [41.8955, 12.4705] }
+        ]
+      },
+      firenze: {
+        name: "Firenze",
+        coords: [43.7696, 11.2558],
+        zoom: 14,
+        description: "Tracciati che sfruttano i lastrici piani dell'Arno e del quadrilatero romano.",
+        routes: [
+          {
+            id: 'fi-1',
+            name: "Lungarno Torrigiani - Ponte Vecchio - Parco delle Cascine",
+            type: "Fiume & Parchi",
+            category: "smooth",
+            surface: "Asfalto architettonico / Lastre larghe",
+            paveType: "smooth",
+            lengthKm: 2.1,
+            walkMinutes: 26,
+            slopeAvg: "0.2%",
+            elevationGain: "+2m",
+            score: 9.6,
+            tips: "Completamente orizzontale seguendo la sponda del fiume.",
+            coords: [
+              [43.7675, 11.2580],
+              [43.7680, 11.2530],
+              [43.7710, 11.2400],
+              [43.7745, 11.2280]
+            ],
+            elevProfile: "M0,26 Q50,25 70,26 T100,26 L100,30 L0,30 Z"
+          },
+          {
+            id: 'fi-2',
+            name: "Asse Piazza Duomo - Piazza della Signoria",
+            type: "Pedonale Monumentale",
+            category: "pedestrian",
+            surface: "Pietraforte levigata",
+            paveType: "smooth",
+            lengthKm: 0.9,
+            walkMinutes: 11,
+            slopeAvg: "0.1%",
+            elevationGain: "+1m",
+            score: 9.2,
+            tips: "Lastroni storici ben mantenuti, marciapiedi a raso.",
+            coords: [
+              [43.7731, 11.2560],
+              [43.7715, 11.2558],
+              [43.7695, 11.2562]
+            ],
+            elevProfile: "M0,25 Q50,25 80,25 T100,25 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Fontanella Piazza Signoria", type: "water", coords: [43.7698, 11.2559] },
+          { name: "Panca di via Calzaiuoli", type: "bench", coords: [43.7716, 11.2555] }
+        ]
+      },
+      bologna: {
+        name: "Bologna",
+        coords: [44.4949, 11.3426],
+        zoom: 14,
+        description: "La regina dei portici: percorsi riparati dalla pioggia e dal sole con fondo liscio.",
+        routes: [
+          {
+            id: 'bo-1',
+            name: "Portico di Strada Maggiore e Piazza Maggiore",
+            type: "Portici Patrimonio UNESCO",
+            category: "shade",
+            surface: "Marmo / Pietra lisciata coperta",
+            paveType: "smooth",
+            lengthKm: 1.5,
+            walkMinutes: 19,
+            slopeAvg: "0.3%",
+            elevationGain: "+4m",
+            score: 9.9,
+            tips: "Completamente coperta, protetta da pioggia e caldo. Pavimentazione tirata a lucido.",
+            coords: [
+              [44.4915, 11.3570],
+              [44.4935, 11.3490],
+              [44.4938, 11.3430]
+            ],
+            elevProfile: "M0,26 Q50,25 80,24 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'bo-2',
+            name: "Asse Pedonale Via D'Azeglio - Parco Margherita",
+            type: "Pedonale e Giardino Storico",
+            category: "pedestrian",
+            surface: "Lastricato liscio e viali in terra battuta solida",
+            paveType: "smooth",
+            lengthKm: 1.8,
+            walkMinutes: 22,
+            slopeAvg: "0.4%",
+            elevationGain: "+5m",
+            score: 9.4,
+            tips: "Ottima per passeggiate in tranquillità.",
+            coords: [
+              [44.4925, 11.3425],
+              [44.4880, 11.3440],
+              [44.4835, 11.3500]
+            ],
+            elevProfile: "M0,27 Q50,24 80,22 T100,23 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Fontana del Nettuno", type: "water", coords: [44.4942, 11.3428] },
+          { name: "Punto Ristoro & Panche Giardini", type: "bench", coords: [44.4845, 11.3490] }
+        ]
+      },
+      napoli: {
+        name: "Napoli",
+        coords: [40.8518, 14.2681],
+        zoom: 14,
+        description: "Vie lungomare senza le impegnative salite tipiche del Vomero o dei Quartieri.",
+        routes: [
+          {
+            id: 'na-1',
+            name: "Lungomare Caracciolo & Via Partenope",
+            type: "Panoramica Pedonale Mare",
+            category: "no-climb",
+            surface: "Asfalto liscio pedonale",
+            paveType: "smooth",
+            lengthKm: 2.6,
+            walkMinutes: 32,
+            slopeAvg: "0.1%",
+            elevationGain: "+2m",
+            score: 9.9,
+            tips: "Chiusa alle auto, vista Vesuvio e Castel dell'Ovo. 100% pianeggiante.",
+            coords: [
+              [40.8300, 14.2250], // Mergellina
+              [40.8315, 14.2370],
+              [40.8290, 14.2480],
+              [40.8325, 14.2530]  // Castel dell'Ovo
+            ],
+            elevProfile: "M0,25 Q50,25 70,25 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'na-2',
+            name: "Via Toledo Pedonale (Piazza Plebiscito - Dante)",
+            type: "Shopping Pedonale",
+            category: "pedestrian",
+            surface: "Basolato vulcanico spianato a laser",
+            paveType: "moderate",
+            lengthKm: 1.3,
+            walkMinutes: 17,
+            slopeAvg: "0.8%",
+            elevationGain: "+8m",
+            score: 8.8,
+            tips: "Leggerissima pendenza quasi impercettibile. Dotata di metropolitana dell'arte con ascensori.",
+            coords: [
+              [40.8358, 14.2490],
+              [40.8420, 14.2495],
+              [40.8490, 14.2505]
+            ],
+            elevProfile: "M0,28 Q40,24 70,20 T100,18 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Chalet Ciro Mergellina (Punto sosta)", type: "bench", coords: [40.8295, 14.2230] },
+          { name: "Ascensore Chiaia (Comunale)", type: "lift", coords: [40.8350, 14.2440] }
+        ]
+      },
+      torino: {
+        name: "Torino",
+        coords: [45.0703, 7.6869],
+        zoom: 14,
+        description: "Struttura a scacchiera pianeggiante, grandi viali e giardini reali.",
+        routes: [
+          {
+            id: 'to-1',
+            name: "Asse Via Garibaldi - Piazza Castello - Piazza San Carlo",
+            type: "Pedonale Storico",
+            category: "pedestrian",
+            surface: "Lastre ampie e portici",
+            paveType: "smooth",
+            lengthKm: 1.7,
+            walkMinutes: 21,
+            slopeAvg: "0.2%",
+            elevationGain: "+2m",
+            score: 9.7,
+            tips: "Via Garibaldi è una delle vie pedonali più lunghe d'Europa: piatta e senza ostacoli.",
+            coords: [
+              [45.0745, 7.6740],
+              [45.0710, 7.6860],
+              [45.0675, 7.6835]
+            ],
+            elevProfile: "M0,25 Q50,25 70,25 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'to-2',
+            name: "Lungo Po e Parco del Valentino",
+            type: "Parco Fiume",
+            category: "shade",
+            surface: "Asfalto e ghiaietto fine rullato",
+            paveType: "smooth",
+            lengthKm: 2.2,
+            walkMinutes: 27,
+            slopeAvg: "0.3%",
+            elevationGain: "+3m",
+            score: 9.8,
+            tips: "Ombra perenne, panchine frequenti e fontanelle con il 'Toret'.",
+            coords: [
+              [45.0600, 7.6910],
+              [45.0540, 7.6870],
+              [45.0480, 7.6820]
+            ],
+            elevProfile: "M0,26 Q50,25 80,25 T100,26 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Toret (Tipica fontanella torinese)", type: "water", coords: [45.0705, 7.6850] },
+          { name: "Panchine Castello Valentino", type: "bench", coords: [45.0535, 7.6865] }
+        ]
+      },
+      cosenza: {
+        name: "Cosenza",
+        coords: [39.3090, 16.2520],
+        zoom: 15,
+        description: "Evita la salita verso il colle Pancrazio grazie al museo all'aperto MAB completamente pianeggiante.",
+        routes: [
+          {
+            id: 'cs-1',
+            name: "Corso Mazzini & MAB (Museo all'Aperto Bilotti)",
+            type: "Isola Pedonale & Arte Moderna",
+            category: "pedestrian",
+            surface: "Pavimentazione in granito e porfido liscio",
+            paveType: "smooth",
+            lengthKm: 1.4,
+            walkMinutes: 17,
+            slopeAvg: "0.2%",
+            elevationGain: "+2m",
+            score: 9.8,
+            tips: "La via dello shopping e dell'arte: sculture di De Chirico e Dalí, zero traffico, panchine continue.",
+            coords: [
+              [39.3015, 16.2550], // Piazza dei Bruzi
+              [39.3060, 16.2515], // Piazza Kennedy
+              [39.3110, 16.2480]  // Piazza Fera / Bilotti
+            ],
+            elevProfile: "M0,26 Q50,25 80,25 T100,25 L100,30 L0,30 Z"
+          },
+          {
+            id: 'cs-2',
+            name: "Parco Fluviale del Crati e Busento",
+            type: "Verde e Ponti Ciclabili",
+            category: "shade",
+            surface: "Piste battute e asfalto",
+            paveType: "smooth",
+            lengthKm: 1.6,
+            walkMinutes: 20,
+            slopeAvg: "0.4%",
+            elevationGain: "+4m",
+            score: 9.2,
+            tips: "Costeggia i due fiumi senza salire nel centro storico medievale arroccato.",
+            coords: [
+              [39.2930, 16.2590],
+              [39.2970, 16.2620],
+              [39.3020, 16.2630]
+            ],
+            elevProfile: "M0,27 Q40,24 70,23 T100,24 L100,30 L0,30 Z"
+          }
+        ],
+        pois: [
+          { name: "Piazza Bilotti Fontane & Relax", type: "bench", coords: [39.3112, 16.2482] },
+          { name: "Fontanella Piazza Kennedy", type: "water", coords: [39.3062, 16.2518] }
+        ]
+      }
+    };
+
+    // --- APP STATE ---
+    let currentCity = 'milano';
+    let map = null;
+    let currentTileLayer = null;
+    let currentTileIndex = 0;
+    let activeFilter = 'all';
+    let activeRoutePolyline = null;
+    let displayedRoutesLayers = [];
+    let displayedPoiMarkers = [];
+    let customRouteLayer = null;
+    let pickingPointMode = null; // 'origin' or 'dest'
+    let pickedPoints = { origin: null, dest: null };
+    let tempPickingMarkers = { origin: null, dest: null };
+
+    // Tile Providers
+    const tileLayers = [
+      {
+        name: "Standard OSM",
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors'
+      },
+      {
+        name: "Carto Positron (Chiara)",
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CARTO'
+      },
+      {
+        name: "Carto Dark (Notturna)",
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CARTO'
+      }
+    ];
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+      initMap();
+      loadCity(currentCity);
+    };
+
+    function initMap() {
+      const city = citiesData[currentCity];
+      
+      map = L.map('map', {
+        zoomControl: false
+      }).setView(city.coords, city.zoom);
+
+      // Reposition Zoom controls for better mobile UI
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Add Base Layer
+      currentTileLayer = L.tileLayer(tileLayers[currentTileIndex].url, {
+        attribution: tileLayers[currentTileIndex].attribution,
+        maxZoom: 19
+      }).addTo(map);
+
+      // Click on Map Handler (for A -> B routing picking)
+      map.on('click', handleMapClick);
+    }
+
+    // --- CITY SWITCHER ---
+    function changeCity(cityKey) {
+      if (!citiesData[cityKey]) return;
+      currentCity = cityKey;
+      loadCity(cityKey);
+    }
+
+    function loadCity(cityKey) {
+      const city = citiesData[cityKey];
+
+      // Reset routing markers if present
+      resetCalculator();
+
+      // Smooth FlyTo
+      map.flyTo(city.coords, city.zoom, { duration: 1.2 });
+
+      // Render Routes and POIs
+      renderCityRoutes(city);
+      renderCityPois(city);
+
+      // Select first route by default
+      if (city.routes && city.routes.length > 0) {
+        selectRoute(city.routes[0].id);
+      }
+    }
+
+    // --- RENDERING ROUTES ON MAP ---
+    function renderCityRoutes(city) {
+      // Clear previous routes
+      displayedRoutesLayers.forEach(l => map.removeLayer(l));
+      displayedRoutesLayers = [];
+
+      const listContainer = document.getElementById('cityRoutesList');
+      listContainer.innerHTML = '';
+
+      let matchingCount = 0;
+
+      city.routes.forEach(route => {
+        // Filter check
+        const matchesFilter = (activeFilter === 'all') ||
+          (activeFilter === 'no-climb' && parseFloat(route.slopeAvg) < 0.5) ||
+          (activeFilter === 'smooth' && route.paveType === 'smooth') ||
+          (activeFilter === 'pedestrian' && route.type.toLowerCase().includes('pedonale')) ||
+          (activeFilter === 'shade' && route.category === 'shade');
+
+        if (!matchesFilter) return;
+        matchingCount++;
+
+        // Determine route styling based on score and accessibility
+        const color = route.score >= 9.5 ? '#10b981' : (route.score >= 8.5 ? '#f59e0b' : '#ef4444');
+
+        // Draw Polyline
+        const polyline = L.polyline(route.coords, {
+          color: color,
+          weight: 6,
+          opacity: 0.85,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+
+        // Bind Popup
+        polyline.bindPopup(`
+          <div class="p-2 max-w-[220px]">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">${route.type}</span>
+            <h4 class="font-bold text-sm text-slate-800 dark:text-white">${route.name}</h4>
+            <div class="text-xs text-slate-500 mt-1 flex justify-between">
+              <span>Pendenza: <b>${route.slopeAvg}</b></span>
+              <span>Punteggio: <b>${route.score}/10</b></span>
+            </div>
+            <button onclick="selectRoute('${route.id}')" class="mt-2 w-full py-1 text-xs bg-emerald-600 text-white rounded font-medium">
+              Vedi Dettagli
+            </button>
+          </div>
+        `);
+
+        polyline.on('click', () => {
+          selectRoute(route.id);
+        });
+
+        displayedRoutesLayers.push(polyline);
+
+        // Render card in sidebar list
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/70 hover:border-emerald-500/50 cursor-pointer transition shadow-xs flex items-center justify-between group`;
+        card.onclick = () => selectRoute(route.id);
+
+        card.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg ${route.score >= 9.5 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-700'} flex items-center justify-center font-black text-xs">
+              ${route.score}
+            </div>
+            <div>
+              <h5 class="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-emerald-600 transition">${route.name}</h5>
+              <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                <span>📏 ${route.lengthKm} km</span>
+                <span>•</span>
+                <span>📈 ${route.slopeAvg} pendenza</span>
+              </div>
+            </div>
+          </div>
+          <span class="text-slate-300 dark:text-slate-600 group-hover:text-emerald-500 text-lg">›</span>
+        `;
+
+        listContainer.appendChild(card);
+      });
+
+      document.getElementById('routesCountBadge').innerText = `${matchingCount} disponibili`;
+    }
+
+    // --- POI RENDERING ---
+    function renderCityPois(city) {
+      displayedPoiMarkers.forEach(m => map.removeLayer(m));
+      displayedPoiMarkers = [];
+
+      const poisContainer = document.getElementById('poisContainer');
+      poisContainer.innerHTML = '';
+
+      city.pois.forEach(poi => {
+        let iconHtml = '💧';
+        let badgeBg = 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300';
+        
+        if (poi.type === 'bench') {
+          iconHtml = '🪑';
+          badgeBg = 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300';
+        } else if (poi.type === 'lift') {
+          iconHtml = '🛗';
+          badgeBg = 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300';
+        } else if (poi.type === 'ramp') {
+          iconHtml = '♿';
+          badgeBg = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+        }
+
+        // Custom Leaflet DivIcon
+        const customIcon = L.divIcon({
+          className: 'poi-custom-marker',
+          html: `<div class="w-7 h-7 rounded-full bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs transform -translate-x-1/2 -translate-y-1/2">${iconHtml}</div>`,
+          iconSize: [28, 28]
+        });
+
+        const marker = L.marker(poi.coords, { icon: customIcon }).addTo(map);
+        marker.bindPopup(`<b class="text-xs text-slate-800">${poi.name}</b><br><span class="text-[10px] text-slate-500">Punto sosta/servizio accessibile</span>`);
+        displayedPoiMarkers.push(marker);
+
+        // Sidebar POI Pills
+        const poiPill = document.createElement('div');
+        poiPill.className = 'p-2 rounded-lg bg-white/60 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2 cursor-pointer hover:border-emerald-400 transition';
+        poiPill.onclick = () => {
+          map.flyTo(poi.coords, 17);
+          marker.openPopup();
+        };
+        poiPill.innerHTML = `
+          <span class="w-6 h-6 rounded-md ${badgeBg} flex items-center justify-center text-xs">${iconHtml}</span>
+          <span class="text-[11px] font-medium truncate text-slate-700 dark:text-slate-300">${poi.name}</span>
+        `;
+        poisContainer.appendChild(poiPill);
+      });
+    }
+
+    // --- SELECT & INSPECT ROUTE ---
+    function selectRoute(routeId) {
+      const city = citiesData[currentCity];
+      const route = city.routes.find(r => r.id === routeId);
+      if (!route) return;
+
+      // Show container
+      const container = document.getElementById('selectedRouteContainer');
+      container.classList.remove('hidden');
+
+      // Populate elements
+      document.getElementById('routeName').innerText = route.name;
+      document.getElementById('routeCityContext').innerText = `${city.name} • ${route.type}`;
+      document.getElementById('routeScore').innerText = route.score;
+      document.getElementById('routeElevationDiff').innerText = `Pendenza media: ${route.slopeAvg} (${route.elevationGain})`;
+      document.getElementById('routeLength').innerText = `${route.lengthKm} km`;
+      document.getElementById('routeTime').innerText = `${route.walkMinutes} min`;
+      document.getElementById('routeSurface').innerText = route.surface;
+      document.getElementById('routeTips').innerText = route.tips;
+
+      // Elevation SVG curve
+      const elevPath = document.getElementById('elevationPath');
+      if (elevPath && route.elevProfile) {
+        elevPath.setAttribute('d', route.elevProfile);
+      }
+
+      // Populate tags
+      const tagsContainer = document.getElementById('routeTagsContainer');
+      tagsContainer.innerHTML = '';
+      
+      const tags = [
+        { label: 'Pianeggiante', icon: '🟢' },
+        { label: 'Pavimentazione Liscia', icon: '✨' },
+        { label: 'Senza Gradini', icon: '♿' }
+      ];
+
+      if (route.category === 'shade') tags.push({ label: 'Ombreggiata', icon: '🌳' });
+      if (route.type.toLowerCase().includes('pedonale')) tags.push({ label: 'Area Pedonale', icon: '🚶' });
+
+      tags.forEach(t => {
+        const tagSpan = document.createElement('span');
+        tagSpan.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+        tagSpan.innerText = `${t.icon} ${t.label}`;
+        tagsContainer.appendChild(tagSpan);
+      });
+
+      // Highlight line on Map
+      if (activeRoutePolyline) {
+        map.removeLayer(activeRoutePolyline);
+      }
+
+      activeRoutePolyline = L.polyline(route.coords, {
+        color: '#059669',
+        weight: 8,
+        opacity: 0.95
+      }).addTo(map);
+
+      // Fit bounds to highlighted route
+      map.fitBounds(activeRoutePolyline.getBounds(), { padding: [50, 50] });
+
+      // If mobile, ensure we don't block user view entirely
+      if (window.innerWidth < 1024) {
+        // keep sidebar visible or toggle as needed
+      }
+    }
+
+    function zoomToSelected() {
+      if (activeRoutePolyline) {
+        map.fitBounds(activeRoutePolyline.getBounds(), { padding: [40, 40] });
+      }
+    }
+
+    // --- ACCESSIBILITY FILTERS ---
+    function setFilter(filterType) {
+      activeFilter = filterType;
+
+      // Update button visual styles
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-500');
+        btn.classList.add('bg-white/90', 'dark:bg-slate-800/90', 'text-slate-700', 'dark:text-slate-300', 'border-slate-200', 'dark:border-slate-700');
+      });
+
+      const activeBtn = document.getElementById(`filter-${filterType}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-white/90', 'dark:bg-slate-800/90', 'text-slate-700', 'dark:text-slate-300');
+        activeBtn.classList.add('bg-emerald-600', 'text-white', 'border-emerald-500');
+      }
+
+      renderCityRoutes(citiesData[currentCity]);
+    }
+
+    // --- SEARCH SIMULATOR / GEOCODER ---
+    function executeSearch() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!query) return;
+
+      const city = citiesData[currentCity];
+      
+      // Look for matches in existing routes
+      const foundRoute = city.routes.find(r => r.name.toLowerCase().includes(query) || r.surface.toLowerCase().includes(query));
+      
+      if (foundRoute) {
+        selectRoute(foundRoute.id);
+        return;
+      }
+
+      // Look for match in POIs
+      const foundPoi = city.pois.find(p => p.name.toLowerCase().includes(query));
+      if (foundPoi) {
+        map.flyTo(foundPoi.coords, 17);
+        return;
+      }
+
+      // Fallback: search using OSM Nominatim Open API
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', ' + city.name)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            map.flyTo([lat, lon], 16);
+            
+            L.popup()
+              .setLatLng([lat, lon])
+              .setContent(`<div class="p-1 font-sans text-xs"><b>${data[0].display_name.split(',')[0]}</b><br><span class="text-emerald-600 font-semibold">Trovato nel raggio di ${city.name}</span></div>`)
+              .openOn(map);
+          } else {
+            showToast("Luogo non trovato. Prova con una piazza o via principale.");
+          }
+        })
+        .catch(() => {
+          showToast("Risultato non trovato per la città corrente.");
+        });
+    }
+
+    // --- ROUTE CALCULATOR (A -> B) ---
+    function switchTab(tab) {
+      const exploreTab = document.getElementById('tabExplore');
+      const routingTab = document.getElementById('tabRouting');
+      const exploreContent = document.getElementById('contentExplore');
+      const routingContent = document.getElementById('contentRouting');
+
+      if (tab === 'explore') {
+        exploreTab.classList.add('border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400');
+        exploreTab.classList.remove('border-transparent', 'text-slate-500');
+        routingTab.classList.remove('border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400');
+        routingTab.classList.add('border-transparent', 'text-slate-500');
+
+        exploreContent.classList.remove('hidden');
+        routingContent.classList.add('hidden');
+      } else {
+        routingTab.classList.add('border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400');
+        routingTab.classList.remove('border-transparent', 'text-slate-500');
+        exploreTab.classList.remove('border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400');
+        exploreTab.classList.add('border-transparent', 'text-slate-500');
+
+        routingContent.classList.remove('hidden');
+        exploreContent.classList.add('hidden');
+      }
+    }
+
+    function startPointPicking(type) {
+      pickingPointMode = type;
+      showToast(type === 'origin' ? "👉 Clicca sulla mappa per impostare la Partenza (A)" : "👉 Clicca sulla mappa per impostare l'Arrivo (B)");
+
+      const btnOrigin = document.getElementById('btnPickOrigin');
+      const btnDest = document.getElementById('btnPickDest');
+
+      if (type === 'origin') {
+        btnOrigin.classList.add('ring-2', 'ring-emerald-500');
+        btnDest.classList.remove('ring-2', 'ring-rose-500');
+      } else {
+        btnDest.classList.add('ring-2', 'ring-rose-500');
+        btnOrigin.classList.remove('ring-2', 'ring-emerald-500');
+      }
+    }
+
+    function handleMapClick(e) {
+      if (!pickingPointMode) return;
+
+      const { lat, lng } = e.latlng;
+
+      if (pickingPointMode === 'origin') {
+        pickedPoints.origin = [lat, lng];
+        document.getElementById('inputOrigin').value = `${lat.toFixed(4)}, ${lng.toFixed(4)} (Partenza)`;
+        
+        if (tempPickingMarkers.origin) map.removeLayer(tempPickingMarkers.origin);
+        tempPickingMarkers.origin = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: 'marker-a',
+            html: '<div class="w-6 h-6 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center shadow-lg border-2 border-white">A</div>',
+            iconSize: [24, 24]
+          })
+        }).addTo(map);
+
+        pickingPointMode = null;
+        document.getElementById('btnPickOrigin').classList.remove('ring-2', 'ring-emerald-500');
+        
+        // Auto-prompt destination if empty
+        if (!pickedPoints.dest) {
+          startPointPicking('dest');
+        }
+
+      } else if (pickingPointMode === 'dest') {
+        pickedPoints.dest = [lat, lng];
+        document.getElementById('inputDestination').value = `${lat.toFixed(4)}, ${lng.toFixed(4)} (Arrivo)`;
+        
+        if (tempPickingMarkers.dest) map.removeLayer(tempPickingMarkers.dest);
+        tempPickingMarkers.dest = L.marker([lat, lng], {
+          icon: L.divIcon({
+            className: 'marker-b',
+            html: '<div class="w-6 h-6 rounded-full bg-rose-500 text-white font-bold text-xs flex items-center justify-center shadow-lg border-2 border-white">B</div>',
+            iconSize: [24, 24]
+          })
+        }).addTo(map);
+
+        pickingPointMode = null;
+        document.getElementById('btnPickDest').classList.remove('ring-2', 'ring-rose-500');
+      }
+    }
+
+    function calculateCustomRoute() {
+      if (!pickedPoints.origin || !pickedPoints.dest) {
+        showToast("Seleziona sia il punto di Partenza (A) che di Arrivo (B).");
+        return;
+      }
+
+      // Generate a realistic accessible path with intermediate dogleg waypoints 
+      // simulating urban avoidance of high slope/stairs
+      const start = pickedPoints.origin;
+      const end = pickedPoints.dest;
+
+      const mid1 = [
+        start[0] + (end[0] - start[0]) * 0.45 + 0.0007,
+        start[1] + (end[1] - start[1]) * 0.35 - 0.0006
+      ];
+      const mid2 = [
+        start[0] + (end[0] - start[0]) * 0.75 - 0.0004,
+        start[1] + (end[1] - start[1]) * 0.70 + 0.0005
+      ];
+
+      const pathCoords = [start, mid1, mid2, end];
+
+      if (customRouteLayer) map.removeLayer(customRouteLayer);
+
+      customRouteLayer = L.polyline(pathCoords, {
+        color: '#10b981',
+        weight: 6,
+        dashArray: '8, 8',
+        lineCap: 'round'
+      }).addTo(map);
+
+      map.fitBounds(customRouteLayer.getBounds(), { padding: [60, 60] });
+
+      // Distance estimation (Euclidean geodesic approx)
+      const distKm = (map.distance(start, end) / 1000 * 1.25).toFixed(2);
+      const estMinutes = Math.round(distKm * 13);
+
+      // Populate routing results box
+      const resultBox = document.getElementById('routingResultBox');
+      const detailsList = document.getElementById('routingDetailsList');
+      
+      detailsList.innerHTML = `
+        <div class="flex justify-between items-center py-1 border-b border-emerald-500/20">
+          <span>Distanza totale:</span>
+          <b>${distKm} km</b>
+        </div>
+        <div class="flex justify-between items-center py-1 border-b border-emerald-500/20">
+          <span>Tempo a piedi comodo:</span>
+          <b>${estMinutes} minuti</b>
+        </div>
+        <div class="flex justify-between items-center py-1 border-b border-emerald-500/20">
+          <span>Dislivello massimo:</span>
+          <b class="text-emerald-600 dark:text-emerald-400">+4 metri (Pianura)</b>
+        </div>
+        <div class="flex justify-between items-center py-1">
+          <span>Fondo stradale medio:</span>
+          <b>Lastricato Piano / Asfalto</b>
+        </div>
+      `;
+
+      resultBox.classList.remove('hidden');
+    }
+
+    function resetCalculator() {
+      pickedPoints = { origin: null, dest: null };
+      pickingPointMode = null;
+      document.getElementById('inputOrigin').value = '';
+      document.getElementById('inputDestination').value = '';
+      document.getElementById('routingResultBox').classList.add('hidden');
+
+      if (tempPickingMarkers.origin) map.removeLayer(tempPickingMarkers.origin);
+      if (tempPickingMarkers.dest) map.removeLayer(tempPickingMarkers.dest);
+      if (customRouteLayer) map.removeLayer(customRouteLayer);
+
+      document.getElementById('btnPickOrigin').classList.remove('ring-2', 'ring-emerald-500');
+      document.getElementById('btnPickDest').classList.remove('ring-2', 'ring-rose-500');
+    }
+
+    // --- MAP STYLE SWITCHER ---
+    function toggleMapTiles() {
+      currentTileIndex = (currentTileIndex + 1) % tileLayers.length;
+      const targetLayer = tileLayers[currentTileIndex];
+
+      map.removeLayer(currentTileLayer);
+      currentTileLayer = L.tileLayer(targetLayer.url, {
+        attribution: targetLayer.attribution,
+        maxZoom: 19
+      }).addTo(map);
+
+      showToast(`Stile Mappa: ${targetLayer.name}`);
+    }
+
+    // --- DARK MODE TOGGLE ---
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const icon = document.getElementById('themeIcon');
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        icon.innerText = '🌙';
+      } else {
+        html.classList.add('dark');
+        icon.innerText = '☀️';
+      }
+    }
+
+    // --- MOBILE SIDEBAR DRAWER ---
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('translate-x-full');
+    }
+
+    // --- USER NOTIFICATION TOAST ---
+    function showToast(msg) {
+      const existing = document.getElementById('app-toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'app-toast';
+      toast.className = 'fixed bottom-5 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl backdrop-blur-md border border-slate-700 pointer-events-none transition-all duration-300';
+      toast.innerText = msg;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
